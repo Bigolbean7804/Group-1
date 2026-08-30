@@ -1,4 +1,7 @@
 Team Contributors
 
-Name | GitHub Username
------|----------------
+Name          | GitHub Username
+--------------|----------------
+Daniela Lopez | zombieg1rl
+
+
