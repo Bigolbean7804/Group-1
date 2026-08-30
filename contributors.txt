@@ -1,5 +1,8 @@
 Team Contributors
 
-Name | GitHub Username
------|----------------
-Finnagin Wantland | FinnWant
+Name               | GitHub Username
+-------------------|----------------
+Christopher Flores | Bigolbean7804
+Daniela Lopez      | zombieg1rl
+Finnagin Wantland  | FinnWant
+
