@@ -1,7 +1,7 @@
 Team Contributors
 
-Name          | GitHub Username
---------------|----------------
-Daniela Lopez | zombieg1rl
-
+Name               | GitHub Username
+-------------------|----------------
+Daniela Lopez      | zombieg1rl
+Christopher Flores | bigolbean7804
 
