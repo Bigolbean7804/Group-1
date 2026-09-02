@@ -23,10 +23,10 @@ def github_auth(url, lsttoken, ct):
 
 
 
-# @dictFiles, empty dictionary of files
+# @fileTouches, empty dictionary of files
 # @lstTokens, GitHub authentication tokens
 # @repo, GitHub repo
-def countfiles(dictfiles, lsttokens, repo):
+def authorFileTouches(fileTouches, lsttokens, repo):
     ipage = 1  # url page counter
     ct = 0  # token counter
 
@@ -46,13 +46,27 @@ def countfiles(dictfiles, lsttokens, repo):
                 # For each commit, use the GitHub commit API to extract the files touched by the commit
                 shaUrl = 'https://api.github.com/repos/' + repo + '/commits/' + sha
                 shaDetails, ct = github_auth(shaUrl, lsttokens, ct)
-                filesjson = shaDetails['files'] 
-                for filenameObj in filesjson:
-                    filename = filenameObj['filename']
-                    # grab source files
+
+                if shaDetails is None or 'files' not in shaDetails:
+                    continue
+
+                commit = shaDetails.get('commit', {})
+                authorInfo = commit.get('author', {})
+                authorName = authorInfo.get('name', 'N/A')
+                commitDate = authorInfo.get('date', 'N/A')
+
+                filesUsed = shaDetails['files']
+                for filePath in filesUsed:
+                    filename = filePath['filename']
                     if filename.endswith((".java", ".kt", ".h", ".c", ".cpp")):
-                        dictfiles[filename] = dictfiles.get(filename, 0) + 1
-                        print(filename)
+                        if filename not in fileTouches:
+                            fileTouches[filename] = []
+                        fileTouches[filename].append({
+                            "author": authorName,
+                            "date": commitDate
+                        })
+                        print("filepath:", filename, " | ", "author:", authorName, " | ", "date:", commitDate)
+               
             ipage += 1
     except:
         print("Error receiving data")
@@ -82,25 +96,12 @@ lstTokens = [token]
 defaultBranch, ct = findDefaultBranch(repo, lstTokens, 0)
 print("Default branch is named ", defaultBranch)
 
-dictfiles = dict()
-countfiles(dictfiles, lstTokens, repo)
-print('Total number of files: ' + str(len(dictfiles)))
+fileTouches = dict()
+authorFileTouches(fileTouches, lstTokens, repo)
+print('Total number of files: ' + str(len(fileTouches)))
 
-file = repo.split('/')[1]
-# change this to the path of your file
-fileOutput = 'data/file_' + file + '.csv'
-rows = ["Filename", "Touches"]
-fileCSV = open(fileOutput, 'w')
-writer = csv.writer(fileCSV)
-writer.writerow(rows)
-
-bigcount = None
-bigfilename = None
-for filename, count in dictfiles.items():
-    rows = [filename, count]
-    writer.writerow(rows)
-    if bigcount is None or count > bigcount:
-        bigcount = count
-        bigfilename = filename
-fileCSV.close()
-print('The file ' + bigfilename + ' has been touched ' + str(bigcount) + ' times.')
+for filepath, touches in fileTouches.items(): 
+    print("\nFile: ", filepath)
+    print("Touches: ", len(touches))
+    for touch in touches:
+        print(touch["author"], " on: ", touch["date"])

@@ -1,11 +1,12 @@
 import json
 import requests
-import csv
+from datetime import datetime
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 import os
 
-if not os.path.exists("data"):
- os.makedirs("data")
+
 
 # GitHub Authentication function
 def github_auth(url, lsttoken, ct):
@@ -23,10 +24,11 @@ def github_auth(url, lsttoken, ct):
 
 
 
-# @dictFiles, empty dictionary of files
+# @fileTouches, empty dictionary of files
 # @lstTokens, GitHub authentication tokens
 # @repo, GitHub repo
-def countfiles(dictfiles, lsttokens, repo):
+def collectTouches(lsttokens, repo):
+    touches = []
     ipage = 1  # url page counter
     ct = 0  # token counter
 
@@ -46,17 +48,31 @@ def countfiles(dictfiles, lsttokens, repo):
                 # For each commit, use the GitHub commit API to extract the files touched by the commit
                 shaUrl = 'https://api.github.com/repos/' + repo + '/commits/' + sha
                 shaDetails, ct = github_auth(shaUrl, lsttokens, ct)
-                filesjson = shaDetails['files'] 
-                for filenameObj in filesjson:
-                    filename = filenameObj['filename']
-                    # grab source files
+
+                if shaDetails is None or 'files' not in shaDetails:
+                    continue
+
+                commit = shaDetails.get('commit', {})
+                authorInfo = commit.get('author', {})
+                authorName = authorInfo.get('name', 'N/A')
+                date = authorInfo.get('date', 'N/A')
+
+                if date == 'N/A':
+                    continue
+
+                commitDate = datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+
+                filesUsed = shaDetails['files']
+                for filePath in filesUsed:
+                    filename = filePath['filename']
                     if filename.endswith((".java", ".kt", ".h", ".c", ".cpp")):
-                        dictfiles[filename] = dictfiles.get(filename, 0) + 1
-                        print(filename)
+                        touches.append((commitDate, filename, authorName))
+                        print("collected the filepath:", filename, " | ", "author:", authorName, " | ", "date:", commitDate)
             ipage += 1
     except:
         print("Error receiving data")
         exit(0)
+    return touches
 
 
 
@@ -82,25 +98,51 @@ lstTokens = [token]
 defaultBranch, ct = findDefaultBranch(repo, lstTokens, 0)
 print("Default branch is named ", defaultBranch)
 
-dictfiles = dict()
-countfiles(dictfiles, lstTokens, repo)
-print('Total number of files: ' + str(len(dictfiles)))
+touches = collectTouches(lstTokens, repo)
 
-file = repo.split('/')[1]
-# change this to the path of your file
-fileOutput = 'data/file_' + file + '.csv'
-rows = ["Filename", "Touches"]
-fileCSV = open(fileOutput, 'w')
-writer = csv.writer(fileCSV)
-writer.writerow(rows)
+earliestCommit = min(t[0] for t in touches)
+print("Earliest commit date: ", earliestCommit)
 
-bigcount = None
-bigfilename = None
-for filename, count in dictfiles.items():
-    rows = [filename, count]
-    writer.writerow(rows)
-    if bigcount is None or count > bigcount:
-        bigcount = count
-        bigfilename = filename
-fileCSV.close()
-print('The file ' + bigfilename + ' has been touched ' + str(bigcount) + ' times.')
+# convert each touch into week, filename, and author
+uniquePoints = set(); 
+for commitDate, filename, authorName, in touches:
+    weeks = (commitDate - earliestCommit).days // 7
+    uniquePoints.add((weeks, filename, authorName))
+print("Unique points:", len(uniquePoints))
+
+
+# mappings
+allFilenames = sorted(set(p[1] for p in uniquePoints))
+filenameToIndex = {filename: i for i, filename in enumerate(allFilenames)}
+
+allAuthors = sorted(set(p[2] for p in uniquePoints))
+authorToColor = {author: i for i, author in enumerate(allAuthors)}
+
+# lists for plotting
+xVal = []
+yVal = []
+colorVal = []
+
+for week, filename, authorName in uniquePoints:
+    xVal.append(week)
+    yVal.append(filenameToIndex[filename])
+    colorVal.append(authorToColor[authorName])
+
+
+# plot
+fig, ax = plt.subplots(figsize=(14, max(6, len(allFilenames) * 0.3)))
+scatter = ax.scatter(yVal, xVal, c=colorVal, cmap='tab20', s=40)
+
+#label axes
+ax.set_xticks(range(len(allFilenames)))
+ax.set_xlabel("file")
+ax.set_ylabel("weeks")
+ax.set_title("Repository Activity")
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
